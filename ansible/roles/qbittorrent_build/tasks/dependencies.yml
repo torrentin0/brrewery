@@ -24,3 +24,29 @@
       - libgeoip-dev
       - libicu-dev
     state: present
+
+- name: Install system Qt 6 development packages
+  ansible.builtin.apt:
+    name:
+      - qt6-base-dev
+      - qt6-tools-dev
+      - qt6-tools-dev-tools
+      - qt6-l10n-tools
+      - qt6-base-private-dev
+    state: present
+  when:
+    - ansible_os_family == "Debian"
+    - qbt_qt_method == 'system'
+    - qbt_qt_major == '6'
+
+- name: Install system Qt 5 development packages
+  ansible.builtin.apt:
+    name:
+      - qtbase5-dev
+      - qttools5-dev
+      - qttools5-dev-tools
+    state: present
+  when:
+    - ansible_os_family == "Debian"
+    - qbt_qt_method == 'system'
+    - qbt_qt_major == '5'

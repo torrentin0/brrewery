@@ -7,6 +7,7 @@
       - libfreetype-dev
       - libxkbcommon-dev
     state: present
+  when: qbt_qt_method == 'vendored'
 
 # qBittorrent 4.3.x builds against Qt 5.14.2, which predates GCC 13+. Newer
 # libstdc++ no longer pulls in <limits> transitively, yet several Qt headers
@@ -29,7 +30,9 @@
   args:
     executable: /bin/bash
   changed_when: true
-  when: qbittorrent_version == "4.3"
+  when:
+    - qbt_qt_method == 'vendored'
+    - qbittorrent_version == "4.3"
 
 # qtbase is configured -openssl-linked against the vendored OpenSSL (built into
 # <prefix> earlier in main.yml) so QtNetwork's SSL classes are enabled; without
@@ -63,6 +66,7 @@
     CFLAGS: "{{ qbt_compiler_flags }}"
     CXXFLAGS: "{{ qbt_compiler_flags }}"
     OPENSSL_ROOT_DIR: "{{ qbittorrent_prefix }}"
+  when: qbt_qt_method == 'vendored'
 
 - name: Build and install vendored qttools
   ansible.builtin.shell: |
@@ -81,12 +85,32 @@
   args:
     executable: /bin/bash
     creates: "{{ qbittorrent_prefix }}/qt{{ qbt_qt_major }}/bin/lrelease"
+  when: qbt_qt_method == 'vendored'
 
 - name: Expose vendored Qt for later build steps
   ansible.builtin.set_fact:
     qbt_qt_prefix_path: "{{ qbittorrent_prefix ~ '/qt' ~ qbt_qt_major }}"
+  when: qbt_qt_method == 'vendored'
 
-- name: Register vendored library paths with the dynamic linker
+# When building against system Qt (e.g. Debian 13 with Qt 6.8.2), remove any
+# leftover vendored Qt installation that would shadow system Qt libraries and
+# break desktop sessions (such as KDE Plasma).
+- name: Remove stale vendored Qt directories that shadow system Qt
+  ansible.builtin.file:
+    path: "{{ qbittorrent_prefix }}/qt{{ qbt_qt_major }}"
+    state: absent
+  when: qbt_qt_method == 'system'
+
+- name: Register library paths with the dynamic linker (system Qt)
+  ansible.builtin.copy:
+    dest: /etc/ld.so.conf.d/brrewery-vendored.conf
+    mode: "0644"
+    content: |
+      # Managed by brrewery — vendored package libraries under /usr/local
+      {{ qbittorrent_prefix }}/lib
+  when: qbt_qt_method == 'system'
+
+- name: Register vendored library paths with the dynamic linker (vendored Qt)
   ansible.builtin.copy:
     dest: /etc/ld.so.conf.d/brrewery-vendored.conf
     mode: "0644"
@@ -94,8 +118,9 @@
       # Managed by brrewery — vendored Qt and package libraries under /usr/local
       {{ qbittorrent_prefix }}/lib
       {{ qbt_qt_prefix_path }}/lib
+  when: qbt_qt_method == 'vendored'
 
-- name: Refresh dynamic linker cache for vendored libraries
+- name: Refresh dynamic linker cache for libraries
   ansible.builtin.command:
     cmd: ldconfig
   changed_when: true

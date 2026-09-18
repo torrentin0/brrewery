@@ -18,6 +18,7 @@ func TestLoadManifest_pinsBuildDependenciesPerLine(t *testing.T) {
 	line, ok := m.LineForVersion("5.2")
 	require.True(t, ok)
 	assert.Equal(t, "6.11.1", line.Qt)
+	assert.Equal(t, "6.5", line.QtMin)
 	assert.Equal(t, "1.3.2", line.Zlib)
 	assert.Equal(t, "3.6.3", line.Openssl)
 	assert.Equal(t, "-O3 -mtune=native", line.CompilerFlags)

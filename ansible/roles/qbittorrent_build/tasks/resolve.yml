@@ -76,7 +76,7 @@
     qbt_libtorrent_tag: "{{ qbt_line.libtorrent.branches[qbt_branch].tag }}"
     qbt_build_system: "{{ qbt_line.build_system }}"
     qbt_cxx_std: "{{ qbt_line.cxx_std | regex_replace('^c\\+\\+', '') }}"
-    qbt_qt_version: "{{ qbt_line.qt }}"
+    qbt_qt_min: "{{ qbt_line.qt_min | default(('6.0' if qbt_line.qt.split('.')[0] == '6' else '5.12')) }}"
     qbt_qt_major: "{{ qbt_line.qt.split('.')[0] }}"
     qbt_zlib: "{{ qbt_line.zlib }}"
     qbt_openssl: "{{ qbt_line.openssl }}"
@@ -84,10 +84,48 @@
     qbt_compiler_flags: "{{ qbt_line.compiler_flags | default('-O2') }}"
     qbt_version_line: "{{ qbt_line.version }}"
 
+# Resolve whether the system already provides a suitable Qt package (matching
+# Swizzin behavior). On Debian/Ubuntu (e.g. Debian 13 with Qt 6.8.2), building
+# against system Qt preserves desktop environments (like KDE Plasma) that share
+# the system Qt runtime, avoids poisoning ld.so.conf with vendored headless Qt,
+# and significantly cuts build time.
+- name: Determine target system Qt package
+  ansible.builtin.set_fact:
+    qbt_qt_pkg: "{{ 'qt6-base-dev' if qbt_qt_major == '6' else 'qtbase5-dev' }}"
+
+- name: Query system Qt package candidate version
+  ansible.builtin.shell: |
+    set -o pipefail
+    apt-cache policy "{{ qbt_qt_pkg }}" 2>/dev/null | awk '/Candidate:/ {print $2}' | sed -E 's/^[0-9]+://; s/[+~-].*//'
+  register: qbt_system_qt_query
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Compare system Qt version against minimum requirement
+  ansible.builtin.command:
+    cmd: dpkg --compare-versions "{{ qbt_system_qt_query.stdout | trim }}" ge "{{ qbt_qt_min }}"
+  register: qbt_system_qt_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_os_family == "Debian"
+    - (qbt_system_qt_query.stdout | default('') | trim | length > 0)
+    - (qbt_system_qt_query.stdout | trim != '(none)')
+
+- name: Resolve effective Qt method
+  ansible.builtin.set_fact:
+    qbt_qt_method: "{{ 'system' if (qbt_system_qt_check.rc | default(1) == 0) else 'vendored' }}"
+
+- name: Apply resolved Qt build parameters
+  ansible.builtin.set_fact:
+    qbt_qt_version: "{{ (qbt_system_qt_query.stdout | trim) if (qbt_qt_method == 'system') else qbt_line.qt }}"
+    qbt_qt_prefix_path: "{{ '' if (qbt_qt_method == 'system') else (qbittorrent_prefix ~ '/qt' ~ qbt_qt_major) }}"
+
 - name: Announce resolved build profile
   ansible.builtin.debug:
     msg: >-
-      Building qBittorrent {{ qbittorrent_release }} (line {{ qbittorrent_version }}, Qt {{ qbt_qt_version }},
+      Building qBittorrent {{ qbittorrent_release }} (line {{ qbittorrent_version }}, Qt {{ qbt_qt_version }} [{{ qbt_qt_method }}],
       libtorrent {{ qbt_branch }} {{ qbt_libtorrent_tag }}, Boost {{ qbt_boost }}, zlib {{ qbt_zlib }}, OpenSSL {{ qbt_openssl }},
       {{ qbt_build_system }}, C++{{ qbt_cxx_std }})
 
@@ -105,6 +143,7 @@
   register: qbt_qt_ssl_ok
   failed_when: false
   changed_when: false
+  when: qbt_qt_method == 'vendored'
 
 - name: Remove a stale vendored Qt that was built without SSL
   ansible.builtin.file:
@@ -115,7 +154,9 @@
     - "{{ qbittorrent_vendor_root }}/sources/qt/{{ qbt_qt_version }}"
   loop_control:
     label: "{{ item }}"
-  when: qbt_qt_ssl_ok.rc != 0
+  when:
+    - qbt_qt_method == 'vendored'
+    - qbt_qt_ssl_ok.rc | default(0) != 0
 
 - name: Ensure clean build root
   ansible.builtin.file:

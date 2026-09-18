@@ -100,9 +100,11 @@
         dest: /etc/ld.so.conf.d/brrewery-vendored.conf
         mode: "0644"
         content: |
-          # Managed by brrewery — vendored Qt and package libraries under /usr/local
+          # Managed by brrewery — vendored package libraries under /usr/local
           {{ qbittorrent_prefix | default('/usr/local') }}/lib
-          {{ qbittorrent_prefix | default('/usr/local') }}/qt{{ qbt_qt_major | default('6') }}/lib
+          {% if qbt_qt_method | default('vendored') == 'vendored' and qbt_qt_prefix_path | default('') | length > 0 %}
+          {{ qbt_qt_prefix_path }}/lib
+          {% endif %}
 
     - name: Refresh dynamic linker cache
       ansible.builtin.command:

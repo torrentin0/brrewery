@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=exec
 User=%i
-Environment=LD_LIBRARY_PATH={{ qbittorrent_prefix }}/lib:{{ qbittorrent_prefix }}/qt{{ qbt_qt_major }}/lib
+Environment=LD_LIBRARY_PATH={{ qbittorrent_prefix }}/lib{% if qbt_qt_method | default('vendored') == 'vendored' and qbt_qt_prefix_path | default('') | length > 0 %}:{{ qbt_qt_prefix_path }}/lib{% endif %}
 ExecStart={{ qbittorrent_bin }} --webui-port={{ qbittorrent_webui_port }}
 Restart=on-failure
 RestartSec=5

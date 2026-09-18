@@ -41,6 +41,7 @@
 - name: Set Qt archive path prefix
   ansible.builtin.set_fact:
     qbt_qt_archive_prefix: "{{ qbt_qt_version.split('.')[0] }}.{{ qbt_qt_version.split('.')[1] }}"
+  when: qbt_qt_method == 'vendored'
 
 - name: Append vendored Qt module sources to the download plan
   ansible.builtin.set_fact:
@@ -57,6 +58,7 @@
           }
         ]
       }}
+  when: qbt_qt_method == 'vendored'
 
 # A source counts as present only if its directory exists AND is non-empty. A
 # bare stat treats an empty leftover directory (e.g. one created by a prior run

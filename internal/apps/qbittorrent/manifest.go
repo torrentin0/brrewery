@@ -39,6 +39,8 @@ type Line struct {
 	CompilerFlags string `yaml:"compiler_flags"`
 	// Qt pins the exact Qt release for this line, e.g. 6.11.1.
 	Qt string `yaml:"qt"`
+	// QtMin specifies the minimum Qt version required for this line (e.g. 6.5).
+	QtMin string `yaml:"qt_min,omitempty"`
 	// Zlib pins the zlib release for this line, e.g. 1.3.2.
 	Zlib string `yaml:"zlib"`
 	// Openssl pins the OpenSSL 3.x release for this line, e.g. 3.6.3.
