@@ -13,7 +13,7 @@ VENDOR_DEST="/usr/share/brrewery/vendor"
 QBT_PATCHES_DIR="/var/lib/brrewery/patches/qbittorrent"
 SSL_DIR="/etc/ssl/brrewery"
 NGINX_ETC="/etc/nginx"
-REPO_URL="${BRREWERY_REPO_URL:-https://github.com/martylukyy/brrewery.git}"
+REPO_URL="${BRREWERY_REPO_URL:-https://github.com/torrentin0/brrewery.git}"
 # Release tag to install (e.g. v1.2.0 or v1.2.0-rc.1). Empty resolves the
 # newest published GitHub release, pre-releases included.
 RELEASE_TAG="${BRREWERY_VERSION:-}"
@@ -99,6 +99,11 @@ run_with_log() {
 # ansible playbooks and contrib config) built by the Release GitHub workflow,
 # verify its checksum and unpack it to $RELEASE_DIR.
 fetch_release() {
+  if [[ -x "$SOURCE_DIR/brrewery" ]]; then
+    RELEASE_DIR="$SOURCE_DIR"
+    return 0
+  fi
+
   if [[ "$(uname -m)" != "x86_64" ]]; then
     echo "Unsupported architecture: $(uname -m) (release binaries are linux/amd64 only)" >&2
     exit 1
@@ -203,7 +208,7 @@ if [[ ! -f "$SSL_DIR/fullchain.pem" ]]; then
 fi
 
 run_with_spinner "Configuring nginx" bash -c "
-  install -d -m 0755 \"$NGINX_ETC/sites-available\" \"$NGINX_ETC/sites-enabled\" &&
+  install -d -m 0755 \"$NGINX_ETC/sites-available\" \"$NGINX_ETC/sites-enabled\" \"$NGINX_ETC/servers-available\" \"$NGINX_ETC/servers-enabled\" &&
     install -m 0644 \"$SOURCE_DIR/contrib/nginx/nginx.conf\" \"$NGINX_ETC/nginx.conf\" &&
     install -m 0644 \"$SOURCE_DIR/contrib/nginx/general.conf\" \"$NGINX_ETC/general.conf\" &&
     install -m 0644 \"$SOURCE_DIR/contrib/nginx/security.conf\" \"$NGINX_ETC/security.conf\" &&
