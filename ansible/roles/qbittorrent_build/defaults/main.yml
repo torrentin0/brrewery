@@ -7,6 +7,7 @@ qbittorrent_operator_patches_dir: /var/lib/brrewery/patches/qbittorrent
 
 # Install prefix and scratch build directory.
 qbittorrent_prefix: /usr/local
+qbittorrent_bin: "{{ qbittorrent_prefix }}/bin/qbittorrent-nox"
 qbittorrent_build_root: /tmp/brrewery-qbittorrent-build
 qbittorrent_boost_root: /opt
 
