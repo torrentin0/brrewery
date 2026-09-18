@@ -1,0 +1,11 @@
+id: netronome
+name: Netronome
+description: Network performance monitoring and speed testing
+category: tools
+web_path: /netronome/
+requires_account_password: true
+detection:
+  binaries:
+    - netronome
+  systemd_user_units:
+    - "netronome@{user}.service"

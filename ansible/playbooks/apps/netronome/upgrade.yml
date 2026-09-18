@@ -1,0 +1,91 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+  vars:
+    netronome_bin: /usr/local/bin/netronome
+    netronome_port: 7575
+  roles:
+    - brrewery_user
+  tasks:
+    - name: Look up brrewery user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ brrewery_user }}"
+      register: brrewery_passwd
+
+    - name: Set brrewery home directory fact
+      ansible.builtin.set_fact:
+        brrewery_home: "{{ brrewery_passwd.ansible_facts.getent_passwd[brrewery_user][4] }}"
+
+    - name: Fetch latest netronome release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/autobrr/netronome/releases/latest
+        return_content: true
+      register: netronome_release
+
+    - name: Resolve netronome linux amd64 download URL
+      ansible.builtin.set_fact:
+        netronome_download_url: >-
+          {{ netronome_release.json.assets
+             | selectattr('name', 'search', 'linux_x86_64')
+             | map(attribute='browser_download_url')
+             | first }}
+
+    - name: Download netronome release archive
+      ansible.builtin.get_url:
+        url: "{{ netronome_download_url }}"
+        dest: /tmp/netronome.tar.gz
+        force: true
+        mode: "0644"
+
+    - name: Ensure netronome extract directory exists
+      ansible.builtin.file:
+        path: /tmp/netronome-extract
+        state: directory
+        mode: "0755"
+
+    - name: Extract netronome binary
+      ansible.builtin.unarchive:
+        src: /tmp/netronome.tar.gz
+        dest: /tmp/netronome-extract
+        remote_src: true
+
+    - name: Install netronome binary
+      ansible.builtin.copy:
+        src: /tmp/netronome-extract/netronome
+        dest: "{{ netronome_bin }}"
+        mode: "0755"
+        remote_src: true
+      notify: Restart netronome
+
+    - name: Ensure netronome base_url is configured
+      ansible.builtin.lineinfile:
+        path: "{{ brrewery_home }}/.config/netronome/config.toml"
+        regexp: '^base_url\s*='
+        line: 'base_url = "/netronome/"'
+      notify: Restart netronome
+
+    - name: Configure nginx reverse proxy for netronome
+      ansible.builtin.include_role:
+        name: brrewery_nginx_site
+      vars:
+        brrewery_app_id: netronome
+        brrewery_app_web_path: /netronome/
+        brrewery_app_upstream: http://127.0.0.1:{{ netronome_port }}
+        brrewery_app_websocket: true
+
+    - name: Flush handlers to ensure nginx reloads
+      ansible.builtin.meta: flush_handlers
+
+  handlers:
+    - name: Restart netronome
+      ansible.builtin.systemd:
+        name: "netronome@{{ brrewery_user }}.service"
+        state: restarted
+
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
