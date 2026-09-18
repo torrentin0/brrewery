@@ -1,0 +1,11 @@
+id: thelounge
+name: The Lounge
+description: Modern web-based IRC client
+category: tools
+web_path: /thelounge/
+requires_account_password: true
+detection:
+  binaries:
+    - thelounge
+  systemd_user_units:
+    - "thelounge@{user}.service"

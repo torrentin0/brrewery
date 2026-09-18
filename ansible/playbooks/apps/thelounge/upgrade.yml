@@ -1,0 +1,119 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+  vars:
+    thelounge_bin: /usr/bin/thelounge
+    thelounge_port: 9000
+  roles:
+    - brrewery_user
+  tasks:
+    - name: Look up brrewery user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ brrewery_user }}"
+      register: brrewery_passwd
+
+    - name: Set brrewery home directory fact
+      ansible.builtin.set_fact:
+        brrewery_home: "{{ brrewery_passwd.ansible_facts.getent_passwd[brrewery_user][4] }}"
+
+    - name: Check installed node version
+      ansible.builtin.command: node -v
+      register: installed_node_version
+      failed_when: false
+      changed_when: false
+
+    - name: Install NodeSource Node.js 22 repository if node is missing or < 22
+      when: installed_node_version.rc != 0 or (installed_node_version.stdout | regex_replace('^v', '') is version('22.0.0', '<'))
+      block:
+        - name: Ensure gnupg and ca-certificates are installed
+          ansible.builtin.apt:
+            name:
+              - gnupg
+              - ca-certificates
+              - curl
+            state: present
+            update_cache: true
+
+        - name: Ensure apt keyrings directory exists
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Download NodeSource GPG signing key
+          ansible.builtin.get_url:
+            url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+            dest: /tmp/nodesource.gpg.key
+            mode: "0644"
+
+        - name: Dearmor NodeSource GPG key
+          ansible.builtin.shell: |
+            set -o pipefail
+            gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg /tmp/nodesource.gpg.key
+            chmod 0644 /etc/apt/keyrings/nodesource.gpg
+
+        - name: Add NodeSource Node.js 22.x repository
+          ansible.builtin.copy:
+            dest: /etc/apt/sources.list.d/nodesource.list
+            mode: "0644"
+            content: "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main\n"
+
+        - name: Install nodejs 22 from NodeSource
+          ansible.builtin.apt:
+            name: nodejs
+            state: latest
+            update_cache: true
+
+    - name: Fetch latest thelounge release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/thelounge/thelounge/releases/latest
+        return_content: true
+      register: thelounge_release
+
+    - name: Resolve thelounge deb download URL
+      ansible.builtin.set_fact:
+        thelounge_download_url: >-
+          {{ thelounge_release.json.assets
+             | selectattr('name', 'search', '\.deb$')
+             | map(attribute='browser_download_url')
+             | first }}
+
+    - name: Download thelounge deb package
+      ansible.builtin.get_url:
+        url: "{{ thelounge_download_url }}"
+        dest: /tmp/thelounge.deb
+        force: true
+        mode: "0644"
+
+    - name: Install thelounge package
+      ansible.builtin.apt:
+        deb: /tmp/thelounge.deb
+        state: present
+      notify: Restart thelounge
+
+    - name: Configure nginx reverse proxy for The Lounge
+      ansible.builtin.include_role:
+        name: brrewery_nginx_site
+      vars:
+        brrewery_app_id: thelounge
+        brrewery_app_web_path: /thelounge/
+        brrewery_app_upstream: http://127.0.0.1:{{ thelounge_port }}
+        brrewery_app_strip_path_prefix: true
+        brrewery_app_websocket: true
+
+    - name: Flush handlers to ensure nginx reloads
+      ansible.builtin.meta: flush_handlers
+
+  handlers:
+    - name: Restart thelounge
+      ansible.builtin.systemd:
+        name: "thelounge@{{ brrewery_user }}.service"
+        state: restarted
+
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded

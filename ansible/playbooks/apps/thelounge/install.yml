@@ -1,0 +1,217 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+  vars:
+    thelounge_bin: /usr/bin/thelounge
+    thelounge_port: 9000
+  roles:
+    - brrewery_user
+  tasks:
+    - name: Look up brrewery user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ brrewery_user }}"
+      register: brrewery_passwd
+
+    - name: Set brrewery home directory fact
+      ansible.builtin.set_fact:
+        brrewery_home: "{{ brrewery_passwd.ansible_facts.getent_passwd[brrewery_user][4] }}"
+
+    - name: Ensure brrewery user home directory exists
+      ansible.builtin.stat:
+        path: "{{ brrewery_home }}"
+      register: brrewery_home_dir
+
+    - name: Fail when brrewery user home is missing
+      ansible.builtin.fail:
+        msg: "Home directory {{ brrewery_home }} for user {{ brrewery_user }} does not exist"
+      when: not brrewery_home_dir.stat.exists
+
+    - name: Require brrewery user password for The Lounge account
+      ansible.builtin.assert:
+        that:
+          - brrewery_user_password is defined
+          - brrewery_user_password | length > 0
+        fail_msg: brrewery_user_password must be supplied for thelounge install
+
+    - name: Check installed node version
+      ansible.builtin.command: node -v
+      register: installed_node_version
+      failed_when: false
+      changed_when: false
+
+    - name: Install NodeSource Node.js 22 repository if node is missing or < 22
+      when: installed_node_version.rc != 0 or (installed_node_version.stdout | regex_replace('^v', '') is version('22.0.0', '<'))
+      block:
+        - name: Ensure gnupg and ca-certificates are installed
+          ansible.builtin.apt:
+            name:
+              - gnupg
+              - ca-certificates
+              - curl
+            state: present
+            update_cache: true
+
+        - name: Ensure apt keyrings directory exists
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Download NodeSource GPG signing key
+          ansible.builtin.get_url:
+            url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+            dest: /tmp/nodesource.gpg.key
+            mode: "0644"
+
+        - name: Dearmor NodeSource GPG key
+          ansible.builtin.shell: |
+            set -o pipefail
+            gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg /tmp/nodesource.gpg.key
+            chmod 0644 /etc/apt/keyrings/nodesource.gpg
+
+        - name: Add NodeSource Node.js 22.x repository
+          ansible.builtin.copy:
+            dest: /etc/apt/sources.list.d/nodesource.list
+            mode: "0644"
+            content: "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main\n"
+
+        - name: Install nodejs 22 from NodeSource
+          ansible.builtin.apt:
+            name: nodejs
+            state: latest
+            update_cache: true
+
+    - name: Fetch latest thelounge release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/thelounge/thelounge/releases/latest
+        return_content: true
+      register: thelounge_release
+
+    - name: Resolve thelounge deb download URL
+      ansible.builtin.set_fact:
+        thelounge_download_url: >-
+          {{ thelounge_release.json.assets
+             | selectattr('name', 'search', '\.deb$')
+             | map(attribute='browser_download_url')
+             | first }}
+
+    - name: Download thelounge deb package
+      ansible.builtin.get_url:
+        url: "{{ thelounge_download_url }}"
+        dest: /tmp/thelounge.deb
+        mode: "0644"
+
+    - name: Install thelounge package
+      ansible.builtin.apt:
+        deb: /tmp/thelounge.deb
+        state: present
+
+    - name: Disable default system-wide thelounge service
+      ansible.builtin.systemd:
+        name: thelounge.service
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Ensure thelounge user directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ brrewery_user }}"
+        group: "{{ brrewery_group }}"
+        mode: "0750"
+      loop:
+        - "{{ brrewery_home }}/.thelounge"
+        - "{{ brrewery_home }}/.thelounge/users"
+
+    - name: Write thelounge config
+      ansible.builtin.copy:
+        dest: "{{ brrewery_home }}/.thelounge/config.js"
+        owner: "{{ brrewery_user }}"
+        group: "{{ brrewery_group }}"
+        mode: "0640"
+        force: false
+        content: |
+          "use strict";
+
+          module.exports = {
+            public: false,
+            host: "127.0.0.1",
+            port: {{ thelounge_port }},
+            bind: undefined,
+            reverseProxy: true,
+            maxHistory: 10000,
+            https: {
+              enable: false,
+            },
+            transports: ["polling", "websocket"],
+          };
+
+    - name: Create thelounge user matching brrewery admin
+      ansible.builtin.shell: |
+        set -euo pipefail
+        THELOUNGE_HOME="{{ brrewery_home }}/.thelounge" "{{ thelounge_bin }}" add "{{ brrewery_user }}" --password "$BRREWERY_USER_PASSWORD" --save-logs
+        touch "{{ brrewery_home }}/.thelounge/.brrewery-user-created"
+      become: true
+      become_user: "{{ brrewery_user }}"
+      environment:
+        BRREWERY_USER_PASSWORD: "{{ brrewery_user_password }}"
+      args:
+        creates: "{{ brrewery_home }}/.thelounge/.brrewery-user-created"
+      no_log: true
+
+    - name: Install thelounge systemd template unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/thelounge@.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=The Lounge (IRC client) for %i
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=%i
+          Group=%i
+          Environment=THELOUNGE_HOME=/home/%i/.thelounge
+          ExecStart={{ thelounge_bin }} start
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd
+
+    - name: Enable and start thelounge for brrewery user
+      ansible.builtin.systemd:
+        name: "thelounge@{{ brrewery_user }}.service"
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Configure nginx reverse proxy for The Lounge
+      ansible.builtin.include_role:
+        name: brrewery_nginx_site
+      vars:
+        brrewery_app_id: thelounge
+        brrewery_app_web_path: /thelounge/
+        brrewery_app_upstream: http://127.0.0.1:{{ thelounge_port }}
+        brrewery_app_strip_path_prefix: true
+        brrewery_app_websocket: true
+
+    - name: Flush handlers to ensure nginx reloads
+      ansible.builtin.meta: flush_handlers
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded
