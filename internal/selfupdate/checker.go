@@ -20,7 +20,7 @@ import (
 const (
 	// DefaultRepo is the GitHub repository releases are fetched from. The Go
 	// module path (autobrr/brrewery) is not where releases are published.
-	DefaultRepo          = "martylukyy/brrewery"
+	DefaultRepo          = "torrentin0/brrewery"
 	DefaultCheckInterval = 6 * time.Hour
 
 	githubAPIBase = "https://api.github.com"
