@@ -356,6 +356,7 @@ export type VnstatReport = {
   version?: string;
   days?: TrafficPeriod[];
   months?: TrafficPeriod[];
+  total?: TrafficPeriod;
 };
 
 export function getVnstatReport(params: { days: number; months: number }) {

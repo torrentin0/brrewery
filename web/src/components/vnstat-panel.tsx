@@ -37,6 +37,15 @@ export function VnstatPanel() {
     isVnstatRangeId,
   );
   const report = vnstat.data;
+  const summary = useMemo(() => {
+    const days = report?.days ?? [];
+    const months = report?.months ?? [];
+    const today = days.length > 0 ? days[days.length - 1] : null;
+    const thisMonth = months.length > 0 ? months[months.length - 1] : null;
+    const allTime = report?.total ?? null;
+    return { today, thisMonth, allTime };
+  }, [report]);
+
   const tableConfig = useMemo(() => {
     const option = VNSTAT_RANGE_OPTIONS.find((o) => o.id === range) ?? VNSTAT_RANGE_OPTIONS[0];
     const periods = report?.[option.source] ?? [];
@@ -89,9 +98,64 @@ export function VnstatPanel() {
       }
     >
       <div>
+        <TrafficSummaryCards
+          today={summary.today}
+          thisMonth={summary.thisMonth}
+          allTime={summary.allTime}
+        />
         <TrafficTable periods={tableConfig.periods} reverse={tableConfig.reverse} />
       </div>
     </Panel>
+  );
+}
+
+function TrafficSummaryCards({
+  today,
+  thisMonth,
+  allTime,
+}: {
+  today: TrafficPeriod | null;
+  thisMonth: TrafficPeriod | null;
+  allTime: TrafficPeriod | null;
+}) {
+  const cards = [
+    { label: "Today", period: today },
+    { label: "This Month", period: thisMonth },
+    { label: "All Time", period: allTime },
+  ];
+
+  return (
+    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {cards.map(({ label, period }) => {
+        const rx = period?.rx_bytes ?? 0;
+        const tx = period?.tx_bytes ?? 0;
+        const total = rx + tx;
+
+        return (
+          <div
+            key={label}
+            className="flex flex-col items-center justify-center rounded-lg border border-border bg-card/60 p-3 text-center"
+          >
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
+            <div className="my-1">
+              <span className="text-xl font-bold tabular-nums text-foreground">
+                {period ? formatBytes(total) : "—"}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-xs tabular-nums">
+              <span className="inline-flex items-center gap-1 text-sky-400">
+                <IconArrowDown className="size-3" aria-hidden="true" />
+                {period ? formatBytes(rx) : "—"}
+              </span>
+              <span className="inline-flex items-center gap-1 text-emerald-400">
+                <IconArrowUp className="size-3" aria-hidden="true" />
+                {period ? formatBytes(tx) : "—"}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

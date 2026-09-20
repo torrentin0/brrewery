@@ -46,6 +46,7 @@ describe("VnstatPanel", () => {
             { label: "2026-05-31", rx_bytes: 100, tx_bytes: 50 },
             { label: "2026-05-30", rx_bytes: 300, tx_bytes: 100 },
           ],
+          total: { label: "All Time", rx_bytes: 50000, tx_bytes: 25000 },
         }),
       }),
     );
@@ -61,6 +62,9 @@ describe("VnstatPanel", () => {
     );
 
     expect(await screen.findByText("2026-05-31")).toBeInTheDocument();
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(screen.getByText("This Month")).toBeInTheDocument();
+    expect(screen.getByText("All Time")).toBeInTheDocument();
 
     const user = userEvent.setup();
 

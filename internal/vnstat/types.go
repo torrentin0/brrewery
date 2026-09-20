@@ -6,6 +6,7 @@ type Report struct {
 	Version   string          `json:"version,omitempty"`
 	Days      []TrafficPeriod `json:"days,omitempty"`
 	Months    []TrafficPeriod `json:"months,omitempty"`
+	Total     *TrafficPeriod  `json:"total,omitempty"`
 }
 
 type TrafficPeriod struct {

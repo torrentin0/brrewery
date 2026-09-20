@@ -18,8 +18,14 @@ type jsonInterface struct {
 }
 
 type jsonTraffic struct {
+	Total *jsonTotal   `json:"total"`
 	Day   []jsonSample `json:"day"`
 	Month []jsonSample `json:"month"`
+}
+
+type jsonTotal struct {
+	Rx uint64 `json:"rx"`
+	Tx uint64 `json:"tx"`
 }
 
 type jsonSample struct {
@@ -45,6 +51,11 @@ func parseReport(dayJSON, monthJSON []byte) (Report, error) {
 		return Report{}, err
 	}
 
+	total := parseTotal(dayJSON)
+	if total == nil {
+		total = parseTotal(monthJSON)
+	}
+
 	version := ""
 	if len(dayJSON) > 0 {
 		var meta jsonReport
@@ -58,7 +69,39 @@ func parseReport(dayJSON, monthJSON []byte) (Report, error) {
 		Version:   version,
 		Days:      days,
 		Months:    months,
+		Total:     total,
 	}, nil
+}
+
+func parseTotal(data []byte) *TrafficPeriod {
+	if len(data) == 0 {
+		return nil
+	}
+	var raw jsonReport
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+
+	var totalRx, totalTx uint64
+	hasData := false
+	for _, iface := range raw.Interfaces {
+		if skipInterface(iface.Name) || iface.Traffic.Total == nil {
+			continue
+		}
+		totalRx += iface.Traffic.Total.Rx
+		totalTx += iface.Traffic.Total.Tx
+		hasData = true
+	}
+
+	if !hasData {
+		return nil
+	}
+
+	return &TrafficPeriod{
+		Label:   "All Time",
+		RxBytes: totalRx,
+		TxBytes: totalTx,
+	}
 }
 
 type periodKind int

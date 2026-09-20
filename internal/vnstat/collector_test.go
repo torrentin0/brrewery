@@ -99,4 +99,9 @@ func TestParseReport_aggregatesInterfaces(t *testing.T) {
 	day := report.Days[len(report.Days)-1]
 	assert.Equal(t, uint64(4_000_000), day.RxBytes)
 	assert.Equal(t, uint64(2_000_000), day.TxBytes)
+
+	require.NotNil(t, report.Total)
+	assert.Equal(t, "All Time", report.Total.Label)
+	assert.Equal(t, uint64(60_000_000), report.Total.RxBytes)
+	assert.Equal(t, uint64(30_000_000), report.Total.TxBytes)
 }
