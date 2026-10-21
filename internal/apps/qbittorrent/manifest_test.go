@@ -34,4 +34,6 @@ func TestLoadManifest_pinsBuildDependenciesPerLine(t *testing.T) {
 	assert.Equal(t, "-O3 -mtune=native", line53.CompilerFlags)
 	assert.Equal(t, "1_86_0", line53.Libtorrent.Branches["RC_1_2"].Boost)
 	assert.Equal(t, "1_91_0", line53.Libtorrent.Branches["RC_2_0"].Boost)
+	assert.Equal(t, "1_91_0", line53.Libtorrent.Branches["RC_2_1"].Boost)
+	assert.Equal(t, "v2.1.2", line53.Libtorrent.Branches["RC_2_1"].Tag)
 }

@@ -22,6 +22,7 @@ const AppID = "qbittorrent"
 const (
 	BranchRC12 = "RC_1_2"
 	BranchRC20 = "RC_2_0"
+	BranchRC21 = "RC_2_1"
 )
 
 // Manifest mirrors ansible/roles/qbittorrent_build/files/qbittorrent/manifest.yml.

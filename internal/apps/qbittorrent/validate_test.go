@@ -23,11 +23,20 @@ func TestLoadManifest(t *testing.T) {
 	assert.Equal(t, "5.2", line.Version)
 	assert.True(t, line.AllowsBranch(qbittorrent.BranchRC12))
 	assert.True(t, line.AllowsBranch(qbittorrent.BranchRC20))
+	assert.False(t, line.AllowsBranch(qbittorrent.BranchRC21))
+
+	line53, ok := m.LineForVersion("5.3")
+	require.True(t, ok)
+	assert.Equal(t, "5.3", line53.Version)
+	assert.True(t, line53.AllowsBranch(qbittorrent.BranchRC12))
+	assert.True(t, line53.AllowsBranch(qbittorrent.BranchRC20))
+	assert.True(t, line53.AllowsBranch(qbittorrent.BranchRC21))
 
 	old, ok := m.LineForVersion("4.3")
 	require.True(t, ok)
 	assert.True(t, old.AllowsBranch(qbittorrent.BranchRC12))
 	assert.False(t, old.AllowsBranch(qbittorrent.BranchRC20))
+	assert.False(t, old.AllowsBranch(qbittorrent.BranchRC21))
 }
 
 func TestValidateInstallOptions(t *testing.T) {
@@ -44,6 +53,8 @@ func TestValidateInstallOptions(t *testing.T) {
 		{name: "known minor rc20", version: "4.6", branch: qbittorrent.BranchRC20},
 		{name: "4.3 allows rc12", version: "4.3", branch: qbittorrent.BranchRC12},
 		{name: "4.3 rejects rc20", version: "4.3", branch: qbittorrent.BranchRC20, wantErr: qbittorrent.ErrBranchNotAllowed},
+		{name: "5.3 allows rc21", version: "5.3", branch: qbittorrent.BranchRC21},
+		{name: "5.2 rejects rc21", version: "5.2", branch: qbittorrent.BranchRC21, wantErr: qbittorrent.ErrBranchNotAllowed},
 		{name: "unknown minor", version: "9.9", branch: "", wantErr: qbittorrent.ErrUnknownVersion},
 		{name: "empty version", version: "", branch: "", wantErr: qbittorrent.ErrUnknownVersion},
 		{name: "garbage branch", version: "5.2", branch: "nope", wantErr: qbittorrent.ErrBranchNotAllowed},
@@ -100,4 +111,9 @@ func TestInstallOptions(t *testing.T) {
 	assert.NotContains(t, opts[1].When.OneOf, "4.3")
 	assert.Contains(t, opts[1].When.OneOf, "5.2")
 	assert.Contains(t, opts[1].When.OneOf, "5.3")
+
+	assert.Contains(t, opts[1].Choices, model.InstallOptionChoice{
+		Value: qbittorrent.BranchRC21,
+		Label: "libtorrent 2.1",
+	})
 }

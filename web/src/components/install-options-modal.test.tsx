@@ -33,6 +33,7 @@ const apps: AppStatus[] = [
         choices: [
           { value: "RC_1_2", label: "libtorrent 1.2" },
           { value: "RC_2_0", label: "libtorrent 2.0" },
+          { value: "RC_2_1", label: "libtorrent 2.1" },
         ],
         when: { key: "qbittorrent_version", one_of: branchVersions },
       },

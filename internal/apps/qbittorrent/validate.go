@@ -51,7 +51,7 @@ func ValidateInstallOptions(version, branch string) error {
 	if branch == "" {
 		return nil
 	}
-	if branch != BranchRC12 && branch != BranchRC20 {
+	if branch != BranchRC12 && branch != BranchRC20 && branch != BranchRC21 {
 		return fmt.Errorf("%w: %q", ErrBranchNotAllowed, branch)
 	}
 	if !line.AllowsBranch(branch) {
