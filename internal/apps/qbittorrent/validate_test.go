@@ -99,4 +99,5 @@ func TestInstallOptions(t *testing.T) {
 	// 4.3 is RC_1_2-only, so it must not gate the branch step.
 	assert.NotContains(t, opts[1].When.OneOf, "4.3")
 	assert.Contains(t, opts[1].When.OneOf, "5.2")
+	assert.Contains(t, opts[1].When.OneOf, "5.3")
 }

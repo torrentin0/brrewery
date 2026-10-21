@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { InstallOptionsModal } from "@/components/install-options-modal";
 import type { AppStatus } from "@/lib/api";
 
-const branchVersions = ["4.4", "4.5", "4.6", "5.0", "5.1", "5.2"];
+const branchVersions = ["4.4", "4.5", "4.6", "5.0", "5.1", "5.2", "5.3"];
 
 const apps: AppStatus[] = [
   {
