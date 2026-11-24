@@ -26,9 +26,9 @@
 - name: Build the vendored source download plan for this install
   ansible.builtin.set_fact:
     qbt_source_downloads:
-      - dest: "sources/qbittorrent/{{ qbt_version_line }}"
+      - dest: "sources/qbittorrent/{{ qbittorrent_release }}"
         url: "https://github.com/qbittorrent/qBittorrent/archive/refs/tags/release-{{ qbittorrent_release }}.tar.gz"
-      - dest: "sources/libtorrent/{{ qbt_branch }}"
+      - dest: "sources/libtorrent/{{ qbt_branch }}-{{ qbt_libtorrent_tag }}"
         url: >-
           https://github.com/arvidn/libtorrent/releases/download/{{ qbt_libtorrent_tag }}/libtorrent-rasterbar-{{ qbt_libtorrent_tag | regex_replace('^v', '') }}.tar.gz
       - dest: "sources/boost/{{ qbt_boost }}"

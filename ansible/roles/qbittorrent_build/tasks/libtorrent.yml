@@ -14,7 +14,7 @@
 
 - name: Stage libtorrent source into the build root
   ansible.builtin.command:
-    cmd: cp -a "{{ qbittorrent_vendor_root }}/sources/libtorrent/{{ qbt_branch }}" "{{ qbittorrent_build_root }}/libtorrent"
+    cmd: cp -a "{{ qbittorrent_vendor_root }}/sources/libtorrent/{{ qbt_branch }}-{{ qbt_libtorrent_tag }}" "{{ qbittorrent_build_root }}/libtorrent"
   args:
     creates: "{{ qbittorrent_build_root }}/libtorrent"
 

@@ -9,6 +9,11 @@
     - brrewery_user
     - qbittorrent_build
   tasks:
+    - name: Clean up qBittorrent build artifacts
+      ansible.builtin.include_role:
+        name: qbittorrent_build
+        tasks_from: cleanup.yml
+
     - name: Restart qBittorrent for brrewery user after rebuild
       ansible.builtin.systemd:
         name: "qbittorrent@{{ brrewery_user }}.service"
